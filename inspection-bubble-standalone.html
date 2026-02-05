@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspection Bubble - Snippet Manager</title>
+    <style>
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+/* Floating Bubble Button */
+.bubble {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    border-radius: 50%;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4), 0 0 0 3px rgba(255, 255, 255, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    z-index: 10000;
+    user-select: none;
+}
+
+.bubble:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5), 0 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.bubble:active {
+    cursor: grabbing;
+    transform: scale(1.05);
+}
+
+.bubble svg {
+    width: 28px;
+    height: 28px;
+    color: white;
+}
+
+.bubble.dragging {
+    cursor: grabbing;
+    transition: none;
+}
+
+/* Main Panel */
+.panel {
+    position: fixed;
+    bottom: 100px;
+    right: 30px;
+    width: 380px;
+    max-height: 520px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.panel.hidden {
+    display: none;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: white;
+}
+
+.panel-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.header-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.icon-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.icon-btn svg {
+    width: 18px;
+    height: 18px;
+    color: white;
+}
+
+/* Search Container */
+.search-container {
+    position: relative;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.search-icon {
+    position: absolute;
+    left: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: #94a3b8;
+}
+
+#searchInput {
+    width: 100%;
+    padding: 10px 36px 10px 40px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#searchInput:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.clear-btn {
+    position: absolute;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #94a3b8;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.clear-btn:hover {
+    background: #64748b;
+}
+
+.clear-btn.hidden {
+    display: none;
+}
+
+/* Search Results */
+.search-results {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.search-results.hidden {
+    display: none;
+}
+
+.search-result-item {
+    padding: 12px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    margin-bottom: 4px;
+}
+
+.search-result-item:hover {
+    background: #f1f5f9;
+}
+
+.search-result-item .category-tag {
+    font-size: 11px;
+    color: #7c3aed;
+    background: #ede9fe;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    display: inline-block;
+}
+
+.search-result-item .title {
+    font-weight: 500;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.search-result-item .preview {
+    font-size: 13px;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Categories Grid */
+.categories-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    align-content: start;
+}
+
+.category-card {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.category-card:hover {
+    border-color: #4f46e5;
+    background: #ede9fe;
+    transform: translateY(-2px);
+}
+
+.category-card .icon {
+    font-size: 28px;
+    margin-bottom: 6px;
+}
+
+.category-card .name {
+    font-size: 12px;
+    font-weight: 500;
+    color: #475569;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.category-card .count {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+/* Snippets View */
+.snippets-view {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.snippets-view.hidden {
+    display: none;
+}
+
+.back-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border: none;
+    border-bottom: 1px solid #e2e8f0;
+    cursor: pointer;
+    font-size: 14px;
+    color: #4f46e5;
+    font-weight: 500;
+    transition: background 0.2s ease;
+}
+
+.back-btn:hover {
+    background: #ede9fe;
+}
+
+.back-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.snippets-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.snippet-item {
+    padding: 14px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 6px;
+    border: 2px solid transparent;
+}
+
+.snippet-item:hover {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+}
+
+.snippet-item .title {
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.snippet-item .title::after {
+    content: "Click to copy";
+    font-size: 10px;
+    font-weight: 400;
+    color: #94a3b8;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.snippet-item:hover .title::after {
+    opacity: 1;
+}
+
+.snippet-item .text {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Copy Notification */
+.copy-notification {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #10b981;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    animation: fadeInUp 0.3s ease;
+}
+
+.copy-notification.hidden {
+    display: none;
+}
+
+.copy-notification svg {
+    width: 18px;
+    height: 18px;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: modalSlide 0.3s ease;
+}
+
+@keyframes modalSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: white;
+}
+
+.modal-header h2 {
+    font-size: 20px;
+}
+
+/* Settings Tabs */
+.settings-tabs {
+    display: flex;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 14px 16px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #64748b;
+    transition: all 0.2s ease;
+    border-bottom: 2px solid transparent;
+}
+
+.tab-btn:hover {
+    color: #4f46e5;
+    background: #ede9fe;
+}
+
+.tab-btn.active {
+    color: #4f46e5;
+    border-bottom-color: #4f46e5;
+    background: white;
+}
+
+.tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+}
+
+.tab-content.hidden {
+    display: none;
+}
+
+/* Add Form */
+.add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.add-form input,
+.add-form select,
+.add-form textarea {
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.add-form input:focus,
+.add-form select:focus,
+.add-form textarea:focus {
+    border-color: #4f46e5;
+}
+
+.add-form textarea {
+    min-height: 100px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+#newCategoryIcon {
+    width: 80px;
+}
+
+.primary-btn {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.danger-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.danger-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Settings List */
+.settings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.settings-item .info {
+    flex: 1;
+    overflow: hidden;
+}
+
+.settings-item .name {
+    font-weight: 500;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.settings-item .preview {
+    font-size: 13px;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 4px;
+}
+
+.settings-item .category-badge {
+    font-size: 11px;
+    color: #7c3aed;
+    background: #ede9fe;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.settings-item .actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 12px;
+}
+
+.settings-item .actions button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.edit-btn {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.edit-btn:hover {
+    background: #cbd5e1;
+}
+
+.delete-btn {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.delete-btn:hover {
+    background: #fecaca;
+}
+
+/* Snippet Filter */
+.snippet-filter {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.snippet-filter label {
+    font-size: 14px;
+    color: #64748b;
+}
+
+.snippet-filter select {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+}
+
+/* Import/Export Section */
+.import-export-section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.import-export-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.import-export-section h3 {
+    font-size: 16px;
+    color: #1e293b;
+    margin-bottom: 8px;
+}
+
+.import-export-section p {
+    font-size: 14px;
+    color: #64748b;
+    margin-bottom: 12px;
+}
+
+.import-export-section input[type="file"] {
+    margin-bottom: 12px;
+}
+
+.import-export-section.danger {
+    background: #fef2f2;
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid #fecaca;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+    </style>
+</head>
+<body>
+    <!-- Floating Bubble Button -->
+    <div id="bubble" class="bubble" title="Click to open snippets">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+    </div>
+
+    <!-- Main Panel -->
+    <div id="panel" class="panel hidden">
+        <div class="panel-header">
+            <h2>Inspection Snippets</h2>
+            <div class="header-buttons">
+                <button id="settingsBtn" class="icon-btn" title="Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                </button>
+                <button id="closeBtn" class="icon-btn" title="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-container">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="searchInput" placeholder="Search snippets..." autocomplete="off">
+            <button id="clearSearch" class="clear-btn hidden">×</button>
+        </div>
+
+        <!-- Search Results -->
+        <div id="searchResults" class="search-results hidden"></div>
+
+        <!-- Categories Grid -->
+        <div id="categoriesView" class="categories-grid"></div>
+
+        <!-- Snippets View -->
+        <div id="snippetsView" class="snippets-view hidden">
+            <button id="backBtn" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"/>
+                    <polyline points="12 19 5 12 12 5"/>
+                </svg>
+                <span id="currentCategory">Back to Categories</span>
+            </button>
+            <div id="snippetsList" class="snippets-list"></div>
+        </div>
+
+        <!-- Copy Notification -->
+        <div id="copyNotification" class="copy-notification hidden">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Copied to clipboard!
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button id="closeSettingsBtn" class="icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="settings-tabs">
+                <button class="tab-btn active" data-tab="categories">Categories</button>
+                <button class="tab-btn" data-tab="snippets">Snippets</button>
+                <button class="tab-btn" data-tab="import-export">Import/Export</button>
+            </div>
+
+            <!-- Categories Tab -->
+            <div id="categoriesTab" class="tab-content active">
+                <div class="add-form">
+                    <input type="text" id="newCategoryName" placeholder="New category name...">
+                    <input type="text" id="newCategoryIcon" placeholder="Emoji (optional)" maxlength="2">
+                    <button id="addCategoryBtn" class="primary-btn">Add Category</button>
+                </div>
+                <div id="categoriesList" class="settings-list"></div>
+            </div>
+
+            <!-- Snippets Tab -->
+            <div id="snippetsTab" class="tab-content hidden">
+                <div class="add-form">
+                    <select id="snippetCategory">
+                        <option value="">Select category...</option>
+                    </select>
+                    <input type="text" id="newSnippetTitle" placeholder="Snippet title...">
+                    <textarea id="newSnippetText" placeholder="Snippet text..."></textarea>
+                    <button id="addSnippetBtn" class="primary-btn">Add Snippet</button>
+                </div>
+                <div class="snippet-filter">
+                    <label>Filter by category:</label>
+                    <select id="filterCategory">
+                        <option value="">All categories</option>
+                    </select>
+                </div>
+                <div id="allSnippetsList" class="settings-list"></div>
+            </div>
+
+            <!-- Import/Export Tab -->
+            <div id="importExportTab" class="tab-content hidden">
+                <div class="import-export-section">
+                    <h3>Export Data</h3>
+                    <p>Download all your categories and snippets as a JSON file.</p>
+                    <button id="exportBtn" class="primary-btn">Export Data</button>
+                </div>
+                <div class="import-export-section">
+                    <h3>Import Data</h3>
+                    <p>Import categories and snippets from a JSON file. This will merge with existing data.</p>
+                    <input type="file" id="importFile" accept=".json">
+                    <button id="importBtn" class="primary-btn">Import Data</button>
+                </div>
+                <div class="import-export-section danger">
+                    <h3>Reset Data</h3>
+                    <p>Delete all categories and snippets and restore defaults.</p>
+                    <button id="resetBtn" class="danger-btn">Reset to Defaults</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+// Default data for Inspection Bubble
+const DEFAULT_DATA = {
+    categories: [
+        { id: 'general', name: 'General', icon: '📋' },
+        { id: 'electrical', name: 'Electrical', icon: '⚡' },
+        { id: 'plumbing', name: 'Plumbing', icon: '🔧' },
+        { id: 'structural', name: 'Structural', icon: '🏗️' },
+        { id: 'safety', name: 'Safety', icon: '⚠️' },
+        { id: 'hvac', name: 'HVAC', icon: '❄️' },
+        { id: 'roofing', name: 'Roofing', icon: '🏠' },
+        { id: 'exterior', name: 'Exterior', icon: '🏢' },
+        { id: 'interior', name: 'Interior', icon: '🚪' },
+        { id: 'appliances', name: 'Appliances', icon: '🔌' },
+        { id: 'foundation', name: 'Foundation', icon: '🧱' },
+        { id: 'windows', name: 'Windows/Doors', icon: '🪟' },
+        { id: 'recommendations', name: 'Recommendations', icon: '✅' },
+        { id: 'defects', name: 'Defects', icon: '❌' },
+        { id: 'satisfactory', name: 'Satisfactory', icon: '👍' }
+    ],
+    snippets: [
+        { id: 1, categoryId: 'general', title: 'Inspection Intro', text: 'This inspection report is based on a visual examination of the readily accessible areas of the property at the time of the inspection.' },
+        { id: 2, categoryId: 'general', title: 'Weather Conditions', text: 'Weather conditions at the time of inspection: Clear skies with temperatures approximately 20°C (68°F).' },
+        { id: 3, categoryId: 'general', title: 'Property Occupied', text: 'The property was occupied and furnished at the time of inspection, which may have limited access to some areas.' },
+        { id: 4, categoryId: 'general', title: 'Age Disclaimer', text: 'Given the age of the property, the conditions noted are considered typical for properties of similar age and construction.' },
+        { id: 5, categoryId: 'electrical', title: 'Panel Adequate', text: 'The electrical panel appears to be adequately sized for the current usage of the property and is in serviceable condition.' },
+        { id: 6, categoryId: 'electrical', title: 'GFCI Missing', text: 'GFCI (Ground Fault Circuit Interrupter) protection is recommended for outlets in wet areas such as bathrooms, kitchen, and exterior locations.' },
+        { id: 7, categoryId: 'electrical', title: 'Outdated Wiring', text: 'The wiring system appears to be original to the property and may not meet current electrical codes. Recommend evaluation by a licensed electrician.' },
+        { id: 8, categoryId: 'electrical', title: 'Double Tapped Breakers', text: 'Double-tapped breakers were observed in the electrical panel. This is a safety concern and should be corrected by a licensed electrician.' },
+        { id: 9, categoryId: 'plumbing', title: 'No Leaks Observed', text: 'No active leaks were observed at visible supply and drain connections at the time of inspection.' },
+        { id: 10, categoryId: 'plumbing', title: 'Water Heater Age', text: 'The water heater appears to be beyond its typical service life (10-15 years). Recommend budgeting for replacement in the near future.' },
+        { id: 11, categoryId: 'plumbing', title: 'Slow Drain', text: 'Slow drainage was noted at this location. Recommend clearing the drain and monitoring for recurring issues.' },
+        { id: 12, categoryId: 'plumbing', title: 'Water Pressure Good', text: 'Water pressure and flow appeared adequate throughout the property at the time of inspection.' },
+        { id: 13, categoryId: 'structural', title: 'Foundation Satisfactory', text: 'The visible portions of the foundation appear to be in satisfactory condition with no significant cracks or movement observed.' },
+        { id: 14, categoryId: 'structural', title: 'Minor Settlement', text: 'Minor settlement cracks were observed. These appear to be typical for the age of the structure and do not appear to indicate active structural movement.' },
+        { id: 15, categoryId: 'structural', title: 'Recommend Engineer', text: 'Significant structural concerns were observed. Recommend evaluation by a licensed structural engineer prior to closing.' },
+        { id: 16, categoryId: 'safety', title: 'Smoke Detectors', text: 'Recommend installing smoke detectors in all sleeping areas and on each level of the home per current safety standards.' },
+        { id: 17, categoryId: 'safety', title: 'CO Detectors', text: 'Carbon monoxide detectors should be installed near sleeping areas and on each level with fuel-burning appliances.' },
+        { id: 18, categoryId: 'safety', title: 'Handrail Missing', text: 'A handrail is recommended for stairs with more than two risers for safety purposes.' },
+        { id: 19, categoryId: 'safety', title: 'Trip Hazard', text: 'A potential trip hazard was observed at this location. Recommend correction for safety.' },
+        { id: 20, categoryId: 'hvac', title: 'System Operational', text: 'The heating and cooling system was operational at the time of inspection and responded to normal controls.' },
+        { id: 21, categoryId: 'hvac', title: 'Filter Dirty', text: 'The HVAC filter was dirty at the time of inspection. Recommend replacement and regular maintenance every 1-3 months.' },
+        { id: 22, categoryId: 'hvac', title: 'System Age', text: 'The HVAC system appears to be nearing the end of its typical service life (15-20 years). Recommend budgeting for replacement.' },
+        { id: 23, categoryId: 'hvac', title: 'Annual Service', text: 'Recommend annual service by a qualified HVAC technician to ensure optimal performance and longevity.' },
+        { id: 24, categoryId: 'roofing', title: 'Roof Satisfactory', text: 'The roof covering appears to be in serviceable condition with no obvious signs of leaks or damage visible from ground level.' },
+        { id: 25, categoryId: 'roofing', title: 'Shingles Aging', text: 'The roof shingles are showing signs of age-related wear including curling and granule loss. Recommend monitoring and budgeting for replacement.' },
+        { id: 26, categoryId: 'roofing', title: 'Flashing Issue', text: 'Flashing around the chimney/vent/wall junction appears deteriorated or improperly sealed. Recommend repair to prevent water intrusion.' },
+        { id: 27, categoryId: 'roofing', title: 'Gutters Clogged', text: 'Gutters were clogged with debris. Recommend cleaning and regular maintenance to ensure proper drainage.' },
+        { id: 28, categoryId: 'exterior', title: 'Siding Good', text: 'The exterior siding appears to be in good condition with no significant damage or deterioration observed.' },
+        { id: 29, categoryId: 'exterior', title: 'Caulking Needed', text: 'Caulking around windows, doors, and penetrations is deteriorated and should be renewed to prevent water intrusion.' },
+        { id: 30, categoryId: 'exterior', title: 'Grading Issue', text: 'The grade slopes toward the foundation in this area. Recommend regrading to direct water away from the structure.' },
+        { id: 31, categoryId: 'exterior', title: 'Paint Peeling', text: 'Paint is peeling or deteriorated in this area. Recommend scraping, priming, and repainting to protect the underlying material.' },
+        { id: 32, categoryId: 'interior', title: 'Walls Satisfactory', text: 'Interior wall and ceiling surfaces are in overall satisfactory condition with only minor cosmetic imperfections noted.' },
+        { id: 33, categoryId: 'interior', title: 'Water Stain', text: 'Water staining was observed on the ceiling/wall. Recommend identifying and correcting the source of moisture before cosmetic repair.' },
+        { id: 34, categoryId: 'interior', title: 'Flooring Good', text: 'Flooring throughout the property appears to be in serviceable condition with normal wear for the age of the property.' },
+        { id: 35, categoryId: 'appliances', title: 'All Operational', text: 'All built-in appliances were tested and found to be operational at the time of inspection.' },
+        { id: 36, categoryId: 'appliances', title: 'Dishwasher Issue', text: 'The dishwasher did not complete a full cycle or showed signs of improper operation. Recommend service or replacement.' },
+        { id: 37, categoryId: 'appliances', title: 'Range Burner Out', text: 'One or more burners on the range were not functioning. Recommend repair by a qualified technician.' },
+        { id: 38, categoryId: 'foundation', title: 'Cracks Minor', text: 'Minor hairline cracks were observed in the foundation. These appear to be typical shrinkage cracks and do not indicate structural concern.' },
+        { id: 39, categoryId: 'foundation', title: 'Moisture Evidence', text: 'Evidence of past moisture intrusion was observed in the basement/crawlspace. Recommend identifying and addressing the source.' },
+        { id: 40, categoryId: 'foundation', title: 'Crawlspace Vapor', text: 'A vapor barrier is recommended in the crawlspace to help control moisture and protect floor framing.' },
+        { id: 41, categoryId: 'windows', title: 'Windows Operational', text: 'Windows tested were operational with no broken glass or failed seals observed.' },
+        { id: 42, categoryId: 'windows', title: 'Seal Failure', text: 'Failed window seals (fogging between panes) were observed indicating the insulating value has been compromised. Recommend replacement.' },
+        { id: 43, categoryId: 'windows', title: 'Door Adjustment', text: 'This door does not latch or close properly. Recommend adjustment or hardware replacement.' },
+        { id: 44, categoryId: 'recommendations', title: 'Priority Repairs', text: 'The following items are recommended as priority repairs to address safety concerns or prevent further damage to the property:' },
+        { id: 45, categoryId: 'recommendations', title: 'Maintenance Items', text: 'The following items are maintenance recommendations to preserve the property and extend the life of its components:' },
+        { id: 46, categoryId: 'recommendations', title: 'Monitor', text: 'This condition should be monitored for changes. If worsening is observed, further evaluation is recommended.' },
+        { id: 47, categoryId: 'defects', title: 'Major Defect', text: 'This is considered a major defect that requires immediate attention and repair by a qualified professional.' },
+        { id: 48, categoryId: 'defects', title: 'Safety Hazard', text: 'This condition presents a safety hazard and should be corrected immediately.' },
+        { id: 49, categoryId: 'defects', title: 'Code Violation', text: 'This condition may not comply with current building codes. Recommend evaluation and correction by a licensed contractor.' },
+        { id: 50, categoryId: 'satisfactory', title: 'Good Condition', text: 'This component is in good condition and performing as intended with no repairs needed at this time.' },
+        { id: 51, categoryId: 'satisfactory', title: 'Normal Wear', text: 'Normal wear consistent with the age and use of the property was observed. No action required.' },
+        { id: 52, categoryId: 'satisfactory', title: 'Well Maintained', text: 'This system/component appears to have been well maintained and is in above-average condition for its age.' }
+    ]
+};
+
+// Inspection Bubble - Main Application
+class InspectionBubble {
+    constructor() {
+        this.data = this.loadData();
+        this.currentCategory = null;
+        this.isDragging = false;
+        this.dragOffset = { x: 0, y: 0 };
+
+        this.initElements();
+        this.bindEvents();
+        this.renderCategories();
+        this.updateSettingsLists();
+    }
+
+    initElements() {
+        this.bubble = document.getElementById('bubble');
+        this.panel = document.getElementById('panel');
+        this.closeBtn = document.getElementById('closeBtn');
+        this.settingsBtn = document.getElementById('settingsBtn');
+        this.searchInput = document.getElementById('searchInput');
+        this.clearSearch = document.getElementById('clearSearch');
+        this.searchResults = document.getElementById('searchResults');
+        this.categoriesView = document.getElementById('categoriesView');
+        this.snippetsView = document.getElementById('snippetsView');
+        this.snippetsList = document.getElementById('snippetsList');
+        this.backBtn = document.getElementById('backBtn');
+        this.currentCategoryLabel = document.getElementById('currentCategory');
+        this.copyNotification = document.getElementById('copyNotification');
+        this.settingsModal = document.getElementById('settingsModal');
+        this.closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        this.tabBtns = document.querySelectorAll('.tab-btn');
+        this.categoriesTab = document.getElementById('categoriesTab');
+        this.snippetsTab = document.getElementById('snippetsTab');
+        this.importExportTab = document.getElementById('importExportTab');
+        this.newCategoryName = document.getElementById('newCategoryName');
+        this.newCategoryIcon = document.getElementById('newCategoryIcon');
+        this.addCategoryBtn = document.getElementById('addCategoryBtn');
+        this.categoriesList = document.getElementById('categoriesList');
+        this.snippetCategory = document.getElementById('snippetCategory');
+        this.newSnippetTitle = document.getElementById('newSnippetTitle');
+        this.newSnippetText = document.getElementById('newSnippetText');
+        this.addSnippetBtn = document.getElementById('addSnippetBtn');
+        this.filterCategory = document.getElementById('filterCategory');
+        this.allSnippetsList = document.getElementById('allSnippetsList');
+        this.exportBtn = document.getElementById('exportBtn');
+        this.importFile = document.getElementById('importFile');
+        this.importBtn = document.getElementById('importBtn');
+        this.resetBtn = document.getElementById('resetBtn');
+    }
+
+    bindEvents() {
+        this.bubble.addEventListener('mousedown', (e) => this.startDrag(e));
+        document.addEventListener('mousemove', (e) => this.drag(e));
+        document.addEventListener('mouseup', () => this.endDrag());
+        this.bubble.addEventListener('touchstart', (e) => this.startDrag(e));
+        document.addEventListener('touchmove', (e) => this.drag(e));
+        document.addEventListener('touchend', () => this.endDrag());
+        this.bubble.addEventListener('click', (e) => {
+            if (!this.wasDragged) this.togglePanel();
+        });
+        this.closeBtn.addEventListener('click', () => this.closePanel());
+        this.searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
+        this.clearSearch.addEventListener('click', () => this.clearSearchInput());
+        this.backBtn.addEventListener('click', () => this.showCategories());
+        this.settingsBtn.addEventListener('click', () => this.openSettings());
+        this.closeSettingsBtn.addEventListener('click', () => this.closeSettings());
+        this.settingsModal.addEventListener('click', (e) => {
+            if (e.target === this.settingsModal) this.closeSettings();
+        });
+        this.tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
+        });
+        this.addCategoryBtn.addEventListener('click', () => this.addCategory());
+        this.newCategoryName.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.addCategory();
+        });
+        this.addSnippetBtn.addEventListener('click', () => this.addSnippet());
+        this.filterCategory.addEventListener('change', () => this.updateSnippetsList());
+        this.exportBtn.addEventListener('click', () => this.exportData());
+        this.importBtn.addEventListener('click', () => this.importData());
+        this.resetBtn.addEventListener('click', () => this.resetData());
+        document.addEventListener('click', (e) => {
+            if (!this.panel.classList.contains('hidden') &&
+                !this.panel.contains(e.target) &&
+                !this.bubble.contains(e.target) &&
+                !this.settingsModal.contains(e.target)) {
+                this.closePanel();
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (!this.settingsModal.classList.contains('hidden')) {
+                    this.closeSettings();
+                } else if (!this.panel.classList.contains('hidden')) {
+                    this.closePanel();
+                }
+            }
+        });
+    }
+
+    loadData() {
+        const saved = localStorage.getItem('inspectionBubbleData');
+        if (saved) return JSON.parse(saved);
+        return JSON.parse(JSON.stringify(DEFAULT_DATA));
+    }
+
+    saveData() {
+        localStorage.setItem('inspectionBubbleData', JSON.stringify(this.data));
+    }
+
+    startDrag(e) {
+        e.preventDefault();
+        this.isDragging = true;
+        this.wasDragged = false;
+        this.bubble.classList.add('dragging');
+        const clientX = e.clientX || e.touches[0].clientX;
+        const clientY = e.clientY || e.touches[0].clientY;
+        const rect = this.bubble.getBoundingClientRect();
+        this.dragOffset = { x: clientX - rect.left, y: clientY - rect.top };
+        this.startPos = { x: clientX, y: clientY };
+    }
+
+    drag(e) {
+        if (!this.isDragging) return;
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        if (clientX === undefined || clientY === undefined) return;
+        const dx = Math.abs(clientX - this.startPos.x);
+        const dy = Math.abs(clientY - this.startPos.y);
+        if (dx > 5 || dy > 5) this.wasDragged = true;
+        const x = clientX - this.dragOffset.x;
+        const y = clientY - this.dragOffset.y;
+        const maxX = window.innerWidth - this.bubble.offsetWidth;
+        const maxY = window.innerHeight - this.bubble.offsetHeight;
+        this.bubble.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+        this.bubble.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+        this.bubble.style.right = 'auto';
+        this.bubble.style.bottom = 'auto';
+        this.updatePanelPosition();
+    }
+
+    endDrag() {
+        this.isDragging = false;
+        this.bubble.classList.remove('dragging');
+    }
+
+    updatePanelPosition() {
+        const bubbleRect = this.bubble.getBoundingClientRect();
+        const panelWidth = 380;
+        const panelHeight = 520;
+        let top = bubbleRect.top - panelHeight - 10;
+        if (top < 10) top = bubbleRect.bottom + 10;
+        let left = bubbleRect.left + bubbleRect.width / 2 - panelWidth / 2;
+        left = Math.max(10, Math.min(left, window.innerWidth - panelWidth - 10));
+        this.panel.style.top = top + 'px';
+        this.panel.style.left = left + 'px';
+        this.panel.style.right = 'auto';
+        this.panel.style.bottom = 'auto';
+    }
+
+    togglePanel() {
+        if (this.panel.classList.contains('hidden')) this.openPanel();
+        else this.closePanel();
+    }
+
+    openPanel() {
+        this.updatePanelPosition();
+        this.panel.classList.remove('hidden');
+        this.searchInput.focus();
+    }
+
+    closePanel() {
+        this.panel.classList.add('hidden');
+        this.clearSearchInput();
+        this.showCategories();
+    }
+
+    renderCategories() {
+        this.categoriesView.innerHTML = '';
+        this.data.categories.forEach(category => {
+            const snippetCount = this.data.snippets.filter(s => s.categoryId === category.id).length;
+            const card = document.createElement('div');
+            card.className = 'category-card';
+            card.innerHTML = `
+                <div class="icon">${category.icon}</div>
+                <div class="name">${category.name}</div>
+                <div class="count">${snippetCount} snippets</div>
+            `;
+            card.addEventListener('click', () => this.showSnippets(category));
+            this.categoriesView.appendChild(card);
+        });
+    }
+
+    showSnippets(category) {
+        this.currentCategory = category;
+        this.currentCategoryLabel.textContent = category.name;
+        this.categoriesView.classList.add('hidden');
+        this.snippetsView.classList.remove('hidden');
+        this.searchResults.classList.add('hidden');
+        const snippets = this.data.snippets.filter(s => s.categoryId === category.id);
+        this.renderSnippetsList(snippets, this.snippetsList);
+    }
+
+    showCategories() {
+        this.currentCategory = null;
+        this.snippetsView.classList.add('hidden');
+        this.categoriesView.classList.remove('hidden');
+        this.searchResults.classList.add('hidden');
+    }
+
+    renderSnippetsList(snippets, container, showCategory = false) {
+        container.innerHTML = '';
+        if (snippets.length === 0) {
+            container.innerHTML = '<div class="snippet-item"><div class="text">No snippets found</div></div>';
+            return;
+        }
+        snippets.forEach(snippet => {
+            const item = document.createElement('div');
+            item.className = showCategory ? 'search-result-item' : 'snippet-item';
+            if (showCategory) {
+                const category = this.data.categories.find(c => c.id === snippet.categoryId);
+                item.innerHTML = `
+                    <div class="category-tag">${category ? category.icon + ' ' + category.name : 'Unknown'}</div>
+                    <div class="title">${snippet.title}</div>
+                    <div class="preview">${snippet.text}</div>
+                `;
+            } else {
+                item.innerHTML = `
+                    <div class="title">${snippet.title}</div>
+                    <div class="text">${snippet.text}</div>
+                `;
+            }
+            item.addEventListener('click', () => this.copySnippet(snippet));
+            container.appendChild(item);
+        });
+    }
+
+    async copySnippet(snippet) {
+        try {
+            await navigator.clipboard.writeText(snippet.text);
+            this.showCopyNotification();
+        } catch (err) {
+            const textarea = document.createElement('textarea');
+            textarea.value = snippet.text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            this.showCopyNotification();
+        }
+    }
+
+    showCopyNotification() {
+        this.copyNotification.classList.remove('hidden');
+        setTimeout(() => { this.copyNotification.classList.add('hidden'); }, 2000);
+    }
+
+    handleSearch(query) {
+        query = query.trim().toLowerCase();
+        if (query.length === 0) {
+            this.clearSearch.classList.add('hidden');
+            this.searchResults.classList.add('hidden');
+            if (this.currentCategory) this.snippetsView.classList.remove('hidden');
+            else this.categoriesView.classList.remove('hidden');
+            return;
+        }
+        this.clearSearch.classList.remove('hidden');
+        this.categoriesView.classList.add('hidden');
+        this.snippetsView.classList.add('hidden');
+        this.searchResults.classList.remove('hidden');
+        const results = this.data.snippets.filter(snippet => {
+            const titleMatch = snippet.title.toLowerCase().includes(query);
+            const textMatch = snippet.text.toLowerCase().includes(query);
+            const category = this.data.categories.find(c => c.id === snippet.categoryId);
+            const categoryMatch = category && category.name.toLowerCase().includes(query);
+            return titleMatch || textMatch || categoryMatch;
+        });
+        this.renderSnippetsList(results, this.searchResults, true);
+    }
+
+    clearSearchInput() {
+        this.searchInput.value = '';
+        this.handleSearch('');
+        this.searchInput.focus();
+    }
+
+    openSettings() {
+        this.settingsModal.classList.remove('hidden');
+        this.updateSettingsLists();
+    }
+
+    closeSettings() {
+        this.settingsModal.classList.add('hidden');
+    }
+
+    switchTab(tabName) {
+        this.tabBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+        this.categoriesTab.classList.toggle('hidden', tabName !== 'categories');
+        this.snippetsTab.classList.toggle('hidden', tabName !== 'snippets');
+        this.importExportTab.classList.toggle('hidden', tabName !== 'import-export');
+        if (tabName === 'snippets') this.updateCategorySelects();
+    }
+
+    updateSettingsLists() {
+        this.updateCategoriesList();
+        this.updateCategorySelects();
+        this.updateSnippetsList();
+    }
+
+    updateCategoriesList() {
+        this.categoriesList.innerHTML = '';
+        this.data.categories.forEach(category => {
+            const snippetCount = this.data.snippets.filter(s => s.categoryId === category.id).length;
+            const item = document.createElement('div');
+            item.className = 'settings-item';
+            item.innerHTML = `
+                <div class="info">
+                    <div class="name">${category.icon} ${category.name}</div>
+                    <div class="preview">${snippetCount} snippets</div>
+                </div>
+                <div class="actions">
+                    <button class="edit-btn" data-id="${category.id}">Edit</button>
+                    <button class="delete-btn" data-id="${category.id}">Delete</button>
+                </div>
+            `;
+            item.querySelector('.edit-btn').addEventListener('click', () => this.editCategory(category));
+            item.querySelector('.delete-btn').addEventListener('click', () => this.deleteCategory(category.id));
+            this.categoriesList.appendChild(item);
+        });
+    }
+
+    updateCategorySelects() {
+        const options = this.data.categories.map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+        this.snippetCategory.innerHTML = '<option value="">Select category...</option>' + options;
+        this.filterCategory.innerHTML = '<option value="">All categories</option>' + options;
+    }
+
+    updateSnippetsList() {
+        const filterValue = this.filterCategory.value;
+        let snippets = this.data.snippets;
+        if (filterValue) snippets = snippets.filter(s => s.categoryId === filterValue);
+        this.allSnippetsList.innerHTML = '';
+        snippets.forEach(snippet => {
+            const category = this.data.categories.find(c => c.id === snippet.categoryId);
+            const item = document.createElement('div');
+            item.className = 'settings-item';
+            item.innerHTML = `
+                <div class="info">
+                    <div class="name">
+                        ${snippet.title}
+                        <span class="category-badge">${category ? category.icon + ' ' + category.name : 'Unknown'}</span>
+                    </div>
+                    <div class="preview">${snippet.text}</div>
+                </div>
+                <div class="actions">
+                    <button class="edit-btn">Edit</button>
+                    <button class="delete-btn">Delete</button>
+                </div>
+            `;
+            item.querySelector('.edit-btn').addEventListener('click', () => this.editSnippet(snippet));
+            item.querySelector('.delete-btn').addEventListener('click', () => this.deleteSnippet(snippet.id));
+            this.allSnippetsList.appendChild(item);
+        });
+    }
+
+    addCategory() {
+        const name = this.newCategoryName.value.trim();
+        if (!name) { alert('Please enter a category name'); return; }
+        const icon = this.newCategoryIcon.value.trim() || '📁';
+        const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
+        this.data.categories.push({ id, name, icon });
+        this.saveData();
+        this.newCategoryName.value = '';
+        this.newCategoryIcon.value = '';
+        this.renderCategories();
+        this.updateSettingsLists();
+    }
+
+    editCategory(category) {
+        const newName = prompt('Edit category name:', category.name);
+        if (newName === null) return;
+        const newIcon = prompt('Edit category icon (emoji):', category.icon);
+        if (newIcon === null) return;
+        category.name = newName.trim() || category.name;
+        category.icon = newIcon.trim() || category.icon;
+        this.saveData();
+        this.renderCategories();
+        this.updateSettingsLists();
+    }
+
+    deleteCategory(categoryId) {
+        const snippetCount = this.data.snippets.filter(s => s.categoryId === categoryId).length;
+        if (!confirm(`Delete this category? ${snippetCount > 0 ? `This will also delete ${snippetCount} snippet(s).` : ''}`)) return;
+        this.data.categories = this.data.categories.filter(c => c.id !== categoryId);
+        this.data.snippets = this.data.snippets.filter(s => s.categoryId !== categoryId);
+        this.saveData();
+        this.renderCategories();
+        this.updateSettingsLists();
+    }
+
+    addSnippet() {
+        const categoryId = this.snippetCategory.value;
+        const title = this.newSnippetTitle.value.trim();
+        const text = this.newSnippetText.value.trim();
+        if (!categoryId) { alert('Please select a category'); return; }
+        if (!title) { alert('Please enter a snippet title'); return; }
+        if (!text) { alert('Please enter snippet text'); return; }
+        const id = Date.now();
+        this.data.snippets.push({ id, categoryId, title, text });
+        this.saveData();
+        this.snippetCategory.value = '';
+        this.newSnippetTitle.value = '';
+        this.newSnippetText.value = '';
+        this.renderCategories();
+        this.updateSnippetsList();
+    }
+
+    editSnippet(snippet) {
+        const newTitle = prompt('Edit snippet title:', snippet.title);
+        if (newTitle === null) return;
+        const newText = prompt('Edit snippet text:', snippet.text);
+        if (newText === null) return;
+        snippet.title = newTitle.trim() || snippet.title;
+        snippet.text = newText.trim() || snippet.text;
+        this.saveData();
+        this.updateSnippetsList();
+    }
+
+    deleteSnippet(snippetId) {
+        if (!confirm('Delete this snippet?')) return;
+        this.data.snippets = this.data.snippets.filter(s => s.id !== snippetId);
+        this.saveData();
+        this.renderCategories();
+        this.updateSnippetsList();
+    }
+
+    exportData() {
+        const dataStr = JSON.stringify(this.data, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'inspection-bubble-data.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    importData() {
+        const file = this.importFile.files[0];
+        if (!file) { alert('Please select a file to import'); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (!importedData.categories || !importedData.snippets) throw new Error('Invalid data structure');
+                importedData.categories.forEach(cat => {
+                    if (!this.data.categories.find(c => c.id === cat.id)) this.data.categories.push(cat);
+                });
+                importedData.snippets.forEach(snip => {
+                    if (!this.data.snippets.find(s => s.id === snip.id)) this.data.snippets.push(snip);
+                });
+                this.saveData();
+                this.renderCategories();
+                this.updateSettingsLists();
+                alert('Data imported successfully!');
+                this.importFile.value = '';
+            } catch (err) {
+                alert('Error importing data: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    resetData() {
+        if (!confirm('Are you sure you want to reset all data? This cannot be undone.')) return;
+        this.data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+        this.saveData();
+        this.renderCategories();
+        this.updateSettingsLists();
+        alert('Data has been reset to defaults.');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.inspectionBubble = new InspectionBubble();
+});
+    </script>
+</body>
+</html>
